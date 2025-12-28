@@ -1,0 +1,458 @@
+#Kafka
+#show last data
+kafka-console-consumer --topic bank_transaction_clean --from-beginning --bootstrap-server kafka:9092 
+{"transaction_id": "100000259178", "customer_id": "ctid495989341", "transaction_type": "Deposit", "amount": "2432161.0", "currency": "IRR", "timestamp": "2024-07-03 00:59:27"}
+{"transaction_id": "100000365838", "customer_id": "ctid630597290", "transaction_type": "Transfer", "amount": "131276.0", "currency": "IRR", "timestamp": "2024-11-13 07:48:09"}
+{"transaction_id": "100000131932", "customer_id": "ctid566629823", "transaction_type": "Deposit", "amount": "239227719.0", "currency": "IRR", "timestamp": "2024-08-23 17:14:47"}
+{"transaction_id": "100000671155", "customer_id": "ctid160590965", "transaction_type": "Withdrawal", "amount": "3175965.0", "currency": "IRR", "timestamp": "2024-01-10 18:38:57"}
+{"transaction_id": "100000121958", "customer_id": "ctid173729400", "transaction_type": "Transfer", "amount": "365509.0", "currency": "IRR", "timestamp": "2024-06-16 10:37:19"}
+^CProcessed a total of 1000000 messages
+[appuser@kafka ~]$ 
+#show list of topic
+kafka-topics --list --bootstrap-server kafka:9092
+[appuser@kafka ~]$ kafka-topics --list --bootstrap-server kafka:9092
+__consumer_offsets
+bank-transactions
+bank_transaction_clean
+bank_transaction_invalid
+[appuser@kafka ~]$ 
+#make table on Hive
+
+#write on HDFS for transaction_raw
+============================================================
+Spark Session created
+============================================================
+
+Connecting to Kafka...
+Kafka connection successful
+Data transformation completed
+
+Writing data to HDFS...
+Path: /user/hive/warehouse/transaction_raw/
+Format: Parquet
+Partition: txn_date, txn_hour
+
+25/11/27 12:15:01 WARN ResolveWriteToStream: spark.sql.adaptive.enabled is not supported in streaming DataFrames/Datasets and will be disabled.
+============================================================
+Streaming started
+============================================================
+
+Data is being written to HDFS...
+Press Ctrl+C to stop...
+#Parquet File for 
+root@1659f9c1eee0:/# hadoop fs -find /user/hive/warehouse/transaction_raw -name "*.parquet" | wc -l
+217110
+root@1659f9c1eee0:/# 
+#Delete for Debug
+hdfs dfs -rm -r /tmp/checkpoint_invalid
+#Data of Hive transaction_raw
+: jdbc:hive2://localhost:10000> describe formatted transaction_raw;
++-------------------------------+----------------------------------------------------+-----------------------+
+|           col_name            |                     data_type                      |        comment        |
++-------------------------------+----------------------------------------------------+-----------------------+
+| # col_name                    | data_type                                          | comment               |
+|                               | NULL                                               | NULL                  |
+| transaction_id                | string                                             |                       |
+| customer_id                   | string                                             |                       |
+| transaction_type              | string                                             |                       |
+| amount                        | double                                             |                       |
+| currency                      | string                                             |                       |
+| txn_timestamp                 | string                                             |                       |
+|                               | NULL                                               | NULL                  |
+| # Partition Information       | NULL                                               | NULL                  |
+| # col_name                    | data_type                                          | comment               |
+|                               | NULL                                               | NULL                  |
+| txn_date                      | string                                             |                       |
+| txn_hour                      | string                                             |                       |
+|                               | NULL                                               | NULL                  |
+| # Detailed Table Information  | NULL                                               | NULL                  |
+| Database:                     | default                                            | NULL                  |
+| Owner:                        | root                                               | NULL                  |
+| CreateTime:                   | Thu Nov 27 07:08:25 UTC 2025                       | NULL                  |
+| LastAccessTime:               | UNKNOWN                                            | NULL                  |
+| Retention:                    | 0                                                  | NULL                  |
+| Location:                     | hdfs://namenode:8020/user/hive/warehouse/transaction_raw | NULL                  |
+
+0: jdbc:hive2://localhost:10000> MSCK REPAIR TABLE transaction_raw;
+No rows affected (4.35 seconds)
+0: jdbc:hive2://localhost:10000> SELECT * FROM transaction_raw limit 10;
++---------------------------------+------------------------------+-----------------------------------+-------------------------+---------------------------+--------------------------------+---------------------------+---------------------------+
+| transaction_raw.transaction_id  | transaction_raw.customer_id  | transaction_raw.transaction_type  | transaction_raw.amount  | transaction_raw.currency  | transaction_raw.txn_timestamp  | transaction_raw.txn_date  | transaction_raw.txn_hour  |
++---------------------------------+------------------------------+-----------------------------------+-------------------------+---------------------------+--------------------------------+---------------------------+---------------------------+
+| 100000679565                    | ctid510442182                | Transfer                          | 1.53081971E8            | IRR                       | 2024-01-01 00:49:41            | 2024-01-01                | 00                        |
+| 100000098340                    | ctid297918500                | Deposit                           | 1672159.0               | IRR                       | 2024-01-01 00:40:50            | 2024-01-01                | 00                        |
+| 100000343410                    | ctid611887967                | Withdrawal                        | 2330394.0               | IRR                       | 2024-01-01 00:19:11            | 2024-01-01                | 00                        |
+| 100000483133                    | ctid944920165                | Deposit                           | 668100.0                | IRR                       | 2024-01-01 00:55:20            | 2024-01-01                | 00                        |
+| 100000935632                    | ctid836337981                | Deposit                           | 3066379.0               | IRR                       | 2024-01-01 00:07:54            | 2024-01-01                | 00                        |
+| 100000947211                    | ctid576973070                | Transfer                          | 23390.0                 | IRR                       | 2024-01-01 00:46:09            | 2024-01-01                | 00                        |
+| 100000881849                    | ctid117463437                | Deposit                           | 1455682.0               | IRR                       | 2024-01-01 00:11:46            | 2024-01-01                | 00                        |
+| 100000510215                    | ctid530946836                | Withdrawal                        | 3365835.0               | IRR                       | 2024-01-01 00:54:02            | 2024-01-01                | 00                        |
+| 100000512970                    | ctid642895746                | Withdrawal                        | 4884400.0               | IRR                       | 2024-01-01 00:28:33            | 2024-01-01                | 00                        |
+| 100000583573                    | ctid619299956                | Transfer                          | 3005765.0               | IRR                       | 2024-01-01 00:55:00            | 2024-01-01                | 00                        |
++---------------------------------+------------------------------+-----------------------------------+-------------------------+---------------------------+--------------------------------+---------------------------+---------------------------+
+10 rows selected (0.879 seconds)
+0: jdbc:hive2://localhost:10000> 
+
+#split
+============================================================
+Spark Session created
+============================================================
+
+Connecting to Kafka...
+Kafka connection successful
+Data transformation completed
+
+Writing clean data to Kafka topic: bank_transaction_clean
+25/11/27 14:51:41 WARN ResolveWriteToStream: spark.sql.adaptive.enabled is not supported in streaming DataFrames/Datasets and will be disabled.
+Writing invalid data to Kafka topic: bank_transaction_invalid
+25/11/27 14:51:41 WARN ResolveWriteToStream: spark.sql.adaptive.enabled is not supported in streaming DataFrames/Datasets and will be disabled.
+============================================================
+Streaming started
+============================================================
+
+Data is being split to two topics:
+1. bank_transaction_clean
+2. bank_transaction_invalid
+Press Ctrl+C to stop...
+
+25/11/27 14:51:48 WARN GarbageCollectionMetrics: To enable non-built-in garbage collector(s) List(G1 Concurrent GC), users should configure it(them) to spark.eventLog.gcMetrics.youngGenerationGarbageCollectors or spark.eventLog.gcMetrics.oldGenerationGarbageCollectors
+25/11/27 14:52:00 WARN AdminClientConfig: These configurations '[key.deserializer, value.deserializer, enable.auto.commit, max.poll.records, auto.offset.reset]' were supplied but are not used yet.
+25/11/27 14:52:00 WARN AdminClientConfig: These configurations '[key.deserializer, value.deserializer, enable.auto.commit, max.poll.records, auto.offset.reset]' were supplied but are not used yet.
+
+
+#show split data
+kafka-console-consumer --topic bank_transaction_clean --from-beginning --bootstrap-server kafka:9092 
+{"transaction_id":"100000131932","customer_id":"ctid566629823","transaction_type":"Deposit","amount":2.39227719E8,"currency":"IRR","txn_timestamp":"2024-08-23 17:14:47","txn_date":"2024-08-23","txn_hour":"17"}
+{"transaction_id":"100000671155","customer_id":"ctid160590965","transaction_type":"Withdrawal","amount":3175965.0,"currency":"IRR","txn_timestamp":"2024-01-10 18:38:57","txn_date":"2024-01-10","txn_hour":"18"}
+{"transaction_id":"100000121958","customer_id":"ctid173729400","transaction_type":"Transfer","amount":365509.0,"currency":"IRR","txn_timestamp":"2024-06-16 10:37:19","txn_date":"2024-06-16","txn_hour":"10"}
+^CProcessed a total of 981074 messages
+[appuser@kafka ~]$ 
+kafka-console-consumer --topic bank_transaction_invalid --from-beginning --bootstrap-server kafka:9092 
+{"transaction_id":"100000219963","customer_id":"ctid937609292","transaction_type":"Deposit","currency":"IRR","txn_timestamp":"2024-05-15 18:17:40","txn_date":"2024-05-15","txn_hour":"18"}
+{"transaction_id":"100000914091","customer_id":"ctid983961863","transaction_type":"Deposit","currency":"IRR","txn_timestamp":"2024-11-11 07:24:21","txn_date":"2024-11-11","txn_hour":"07"}
+{"transaction_id":"100000021959","customer_id":"ctid589497177","transaction_type":"Deposit","currency":"IRR","txn_timestamp":"2024-03-07 06:00:54","txn_date":"2024-03-07","txn_hour":"06"}
+{"transaction_id":"100000012666","customer_id":"ctid887138571","transaction_type":"Withdrawal","currency":"IRR","txn_timestamp":"2024-09-29 18:10:27","txn_date":"2024-09-29","txn_hour":"18"}
+{"transaction_id":"100000348951","customer_id":"ctid115948981","transaction_type":"Transfer","currency":"IRR","txn_timestamp":"2024-04-29 21:48:11","txn_date":"2024-04-29","txn_hour":"21"}
+{"transaction_id":"100000572843","customer_id":"ctid919190984","transaction_type":"Deposit","currency":"IRR","txn_timestamp":"2024-06-21 02:07:58","txn_date":"2024-06-21","txn_hour":"02"}
+{"transaction_id":"100000270936","customer_id":"ctid354422952","transaction_type":"Transfer","currency":"IRR","txn_timestamp":"2024-05-10 00:44:27","txn_date":"2024-05-10","txn_hour":"00"}
+^CProcessed a total of 19993 messages
+[appuser@kafka ~]$ 
+
+
+
+#invalid table in Hive
+0: jdbc:hive2://localhost:10000> describe formatted bank_transaction_invalid;
++-------------------------------+----------------------------------------------------+-----------------------+
+|           col_name            |                     data_type                      |        comment        |
++-------------------------------+----------------------------------------------------+-----------------------+
+| # col_name                    | data_type                                          | comment               |
+|                               | NULL                                               | NULL                  |
+| transaction_id                | string                                             |                       |
+| customer_id                   | string                                             |                       |
+| transaction_type              | string                                             |                       |
+| amount                        | double                                             |                       |
+| currency                      | string                                             |                       |
+| txn_timestamp                 | string                                             |                       |
+|                               | NULL                                               | NULL                  |
+| # Partition Information       | NULL                                               | NULL                  |
+| # col_name                    | data_type                                          | comment               |
+|                               | NULL                                               | NULL                  |
+| txn_date                      | string                                             |                       |
+| txn_hour                      | string                                             |                       |
+|                               | NULL                                               | NULL                  |
+| # Detailed Table Information  | NULL                                               | NULL                  |
+| Database:                     | default                                            | NULL                  |
+| Owner:                        | root                                               | NULL                  |
+| CreateTime:                   | Thu Nov 27 09:17:59 UTC 2025                       | NULL                  |
+| LastAccessTime:               | UNKNOWN                                            | NULL                  |
+| Retention:                    | 0                                                  | NULL                  |
+| Location:                     | hdfs://namenode:8020/user/hive/warehouse/bank_transaction_invalid | NULL                  |
+
+0: jdbc:hive2://localhost:10000> select * from bank_transaction_invalid limit 10;
++------------------------------------------+---------------------------------------+--------------------------------------------+----------------------------------+------------------------------------+-----------------------------------------+------------------------------------+------------------------------------+
+| bank_transaction_invalid.transaction_id  | bank_transaction_invalid.customer_id  | bank_transaction_invalid.transaction_type  | bank_transaction_invalid.amount  | bank_transaction_invalid.currency  | bank_transaction_invalid.txn_timestamp  | bank_transaction_invalid.txn_date  | bank_transaction_invalid.txn_hour  |
++------------------------------------------+---------------------------------------+--------------------------------------------+----------------------------------+------------------------------------+-----------------------------------------+------------------------------------+------------------------------------+
+| 100000047464                             | ctid713343715                         | Withdrawal                                 | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000307717                             | ctid193708442                         | Withdrawal                                 | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000087218                             | ctid565187686                         | Transfer                                   | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000386916                             | ctid953388143                         | Transfer                                   | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000283896                             | ctid245357387                         | Transfer                                   | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000838248                             | ctid215530637                         | Transfer                                   | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000374192                             | ctid638162338                         | Transfer                                   | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000623411                             | ctid573129316                         | Deposit                                    | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000589533                             | ctid338034745                         | Deposit                                    | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
+| 100000235652                             | ctid321511712                         | Withdrawal                                 | NULL                             | IRR                                | NULL                                    | __HIVE_DEFAULT_PARTITION__         | __HIVE_DEFAULT_PARTITION__         |
++------------------------------------------+---------------------------------------+--------------------------------------------+----------------------------------+------------------------------------+-----------------------------------------+------------------------------------+------------------------------------+
+10 rows selected (0.297 seconds)
+0: jdbc:hive2://localhost:10000> 
+
+
+
+
+
+#fruad alerts 
+e3bf0ddd2588 :) show create table fraud_alerts;
+
+SHOW CREATE TABLE fraud_alerts
+
+Query id: 19298f8d-f3fa-47ed-9c67-42e187e4e892
+
+Connecting to localhost:9000 as user default.
+Connected to ClickHouse server version 25.10.2.
+
+   ┌─statement──────────────────────────────┐
+1. │ CREATE TABLE default.fraud_alerts     ↴│
+   │↳(                                     ↴│
+   │↳    `transaction_id` String,          ↴│
+   │↳    `customer_id` String,             ↴│
+   │↳    `transaction_type` String,        ↴│
+   │↳    `amount` Float64,                 ↴│
+   │↳    `currency` String,                ↴│
+   │↳    `fraud_type` String,              ↴│
+   │↳    `fraud_timestamp` String          ↴│
+   │↳)                                     ↴│
+   │↳ENGINE = MergeTree                    ↴│
+   │↳ORDER BY (fraud_timestamp, fraud_type)↴│
+   │↳SETTINGS index_granularity = 8192      │
+   └────────────────────────────────────────┘
+
+1 row in set. Elapsed: 0.002 sec. 
+
+e3bf0ddd2588 :) 
+e3bf0ddd2588 :) SELECT 
+    fraud_type,
+    count(*) as count,
+    round(count(*) * 100.0 / (SELECT count(*) FROM fraud_alerts), 2) as percentage
+FROM fraud_alerts 
+GROUP BY fraud_type
+ORDER BY count DESC;
+
+SELECT
+    fraud_type,
+    count(*) AS count,
+    round((count(*) * 100.) / (
+        SELECT count(*)
+        FROM fraud_alerts
+    ), 2) AS percentage
+FROM fraud_alerts
+GROUP BY fraud_type
+ORDER BY count DESC
+
+Query id: b7015f2e-e875-413e-9f48-35e14c463d4c
+
+   ┌─fraud_type─────────────┬─count─┬─percentage─┐
+1. │ HIGH_AMOUNT            │ 30189 │      50.22 │
+2. │ HIGH_TRANSACTION_COUNT │ 29926 │      49.78 │
+   └────────────────────────┴───────┴────────────┘
+
+2 rows in set. Elapsed: 0.026 sec. Processed 60.12 thousand rows, 1.47 MB (2.31 million rows/s., 56.48 MB/s.)
+Peak memory usage: 1.86 MiB.
+
+e3bf0ddd2588 :) SELECT 
+    customer_id,
+    count(*) as alert_count,
+    groupUniqArray(fraud_type) as fraud_types
+FROM fraud_alerts 
+GROUP BY customer_id
+ORDER BY alert_count DESC
+LIMIT 10;
+
+SELECT
+    customer_id,
+    count(*) AS alert_count,
+    groupUniqArray(fraud_type) AS fraud_types
+FROM fraud_alerts
+GROUP BY customer_id
+ORDER BY alert_count DESC
+LIMIT 10
+
+Query id: 03521916-b244-42ee-8545-1b61263fe4bb
+
+    ┌─customer_id───┬─alert_count─┬─fraud_types──────────────────────────────┐
+ 1. │ ctid897371929 │          47 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 2. │ ctid553213862 │          46 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 3. │ ctid779230727 │          45 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 4. │ ctid443803926 │          45 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 5. │ ctid418079921 │          44 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 6. │ ctid295521941 │          44 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 7. │ ctid531175504 │          44 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 8. │ ctid894318271 │          44 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+ 9. │ ctid565358507 │          43 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+10. │ ctid264371617 │          43 │ ['HIGH_AMOUNT','HIGH_TRANSACTION_COUNT'] │
+    └───────────────┴─────────────┴──────────────────────────────────────────┘
+
+10 rows in set. Elapsed: 0.020 sec. Processed 60.12 thousand rows, 2.73 MB (3.01 million rows/s., 137.04 MB/s.)
+Peak memory usage: 8.26 MiB.
+
+e3bf0ddd2588 :) SELECT 
+    round(amount / 1000000) as amount_million,
+    count(*) as count
+FROM fraud_alerts 
+WHERE fraud_type = 'HIGH_AMOUNT'
+GROUP BY amount_million
+ORDER BY amount_million DESC
+LIMIT 15;
+
+SELECT
+    round(amount / 1000000) AS amount_million,
+    count(*) AS count
+FROM fraud_alerts
+WHERE fraud_type = 'HIGH_AMOUNT'
+GROUP BY amount_million
+ORDER BY amount_million DESC
+LIMIT 15
+
+Query id: 3917d991-3238-46dc-a3d4-5c99c2ac351d
+
+    ┌─amount_million─┬─count─┐
+ 1. │           1000 │    16 │
+ 2. │            999 │    28 │
+ 3. │            998 │    31 │
+ 4. │            997 │    28 │
+ 5. │            996 │    37 │
+ 6. │            995 │    37 │
+ 7. │            994 │    33 │
+ 8. │            993 │    34 │
+ 9. │            992 │    36 │
+10. │            991 │    36 │
+11. │            990 │    42 │
+12. │            989 │    35 │
+13. │            988 │    42 │
+14. │            987 │    32 │
+15. │            986 │    27 │
+    └────────────────┴───────┘
+
+15 rows in set. Elapsed: 0.014 sec. Processed 59.56 thousand rows, 1.93 MB (4.30 million rows/s., 139.41 MB/s.)
+Peak memory usage: 863.61 KiB.
+
+e3bf0ddd2588 :) SELECT 
+    transaction_type,
+    fraud_type,
+    count(*) as count,
+    avg(amount) as avg_amount
+FROM fraud_alerts 
+GROUP BY transaction_type, fraud_type
+ORDER BY count DESC;
+
+SELECT
+    transaction_type,
+    fraud_type,
+    count(*) AS count,
+    avg(amount) AS avg_amount
+FROM fraud_alerts
+GROUP BY
+    transaction_type,
+    fraud_type
+ORDER BY count DESC
+
+Query id: bb527c60-7669-44a2-9336-f112f802108d
+
+   ┌─transaction_type─┬─fraud_type─────────────┬─count─┬────────avg_amount─┐
+1. │ MULTIPLE_TXNS    │ HIGH_TRANSACTION_COUNT │ 29926 │                 0 │
+2. │ Deposit          │ HIGH_AMOUNT            │ 10107 │ 551618803.3952706 │
+3. │ Transfer         │ HIGH_AMOUNT            │ 10067 │ 547193060.7955697 │
+4. │ Withdrawal       │ HIGH_AMOUNT            │ 10015 │ 548982294.6096854 │
+   └──────────────────┴────────────────────────┴───────┴───────────────────┘
+
+4 rows in set. Elapsed: 0.016 sec. Processed 60.12 thousand rows, 3.07 MB (3.80 million rows/s., 193.94 MB/s.)
+Peak memory usage: 7.81 MiB.
+
+e3bf0ddd2588 :) SELECT 
+    customer_id,
+    countIf(fraud_type = 'HIGH_AMOUNT') as high_amount_count,
+    countIf(fraud_type = 'HIGH_TRANSACTION_COUNT') as high_count_count,
+    count(*) as total_alerts
+FROM fraud_alerts 
+GROUP BY customer_id
+HAVING high_amount_count > 0 AND high_count_count > 0
+ORDER BY total_alerts DESC
+LIMIT 10;
+
+SELECT
+    customer_id,
+    countIf(fraud_type = 'HIGH_AMOUNT') AS high_amount_count,
+    countIf(fraud_type = 'HIGH_TRANSACTION_COUNT') AS high_count_count,
+    count(*) AS total_alerts
+FROM fraud_alerts
+GROUP BY customer_id
+HAVING (high_amount_count > 0) AND (high_count_count > 0)
+ORDER BY total_alerts DESC
+LIMIT 10
+
+Query id: 6439f1c5-b35a-4d44-9a2f-f12679a1447d
+
+    ┌─customer_id───┬─high_amount_count─┬─high_count_count─┬─total_alerts─┐
+ 1. │ ctid897371929 │                12 │               35 │           47 │
+ 2. │ ctid553213862 │                 9 │               37 │           46 │
+ 3. │ ctid443803926 │                13 │               32 │           45 │
+ 4. │ ctid779230727 │                 9 │               36 │           45 │
+ 5. │ ctid295521941 │                11 │               33 │           44 │
+ 6. │ ctid418079921 │                11 │               33 │           44 │
+ 7. │ ctid894318271 │                11 │               33 │           44 │
+ 8. │ ctid531175504 │                 9 │               35 │           44 │
+ 9. │ ctid565358507 │                 7 │               36 │           43 │
+10. │ ctid880448613 │                10 │               33 │           43 │
+    └───────────────┴───────────────────┴──────────────────┴──────────────┘
+
+10 rows in set. Elapsed: 0.017 sec. Processed 60.12 thousand rows, 2.73 MB (3.62 million rows/s., 164.77 MB/s.)
+Peak memory usage: 4.41 MiB.
+
+e3bf0ddd2588 :) SELECT 
+    uniq(customer_id) as unique_customers,
+    count(*) as total_alerts,
+    avg(amount) as avg_amount,
+    max(amount) as max_amount
+FROM fraud_alerts;
+
+SELECT
+    uniq(customer_id) AS unique_customers,
+    count(*) AS total_alerts,
+    avg(amount) AS avg_amount,
+    max(amount) AS max_amount
+FROM fraud_alerts
+
+Query id: 4b1efd47-3246-4086-bc9b-1067f51bfaf9
+
+   ┌─unique_customers─┬─total_alerts─┬────────avg_amount─┬─max_amount─┐
+1. │            14962 │        60115 │ 275835672.7848457 │  999998615 │
+   └──────────────────┴──────────────┴───────────────────┴────────────┘
+
+1 row in set. Elapsed: 0.009 sec. Processed 60.12 thousand rows, 1.74 MB (6.78 million rows/s., 196.18 MB/s.)
+Peak memory usage: 2.11 MiB.
+
+e3bf0ddd2588 :) SELECT 
+    toDate(substring(fraud_timestamp, 1, 10)) as alert_date,
+    fraud_type,
+    count(*) as daily_count
+FROM fraud_alerts 
+WHERE fraud_timestamp != ''
+GROUP BY alert_date, fraud_type
+ORDER BY alert_date DESC, daily_count DESC
+LIMIT 10;
+
+SELECT
+    toDate(substring(fraud_timestamp, 1, 10)) AS alert_date,
+    fraud_type,
+    count(*) AS daily_count
+FROM fraud_alerts
+WHERE fraud_timestamp != ''
+GROUP BY
+    alert_date,
+    fraud_type
+ORDER BY
+    alert_date DESC,
+    daily_count DESC
+LIMIT 10
+
+Query id: 6ea76f5c-667c-4fe2-a267-147354b42514
+
+   ┌─alert_date─┬─fraud_type─────────────┬─daily_count─┐
+1. │ 2025-11-27 │ HIGH_TRANSACTION_COUNT │       29926 │
+   └────────────┴────────────────────────┴─────────────┘
+
+1 row in set. Elapsed: 0.016 sec. Processed 60.12 thousand rows, 2.64 MB (3.85 million rows/s., 169.06 MB/s.)
+Peak memory usage: 4.21 MiB.
+
+e3bf0ddd2588 :) 
+
+

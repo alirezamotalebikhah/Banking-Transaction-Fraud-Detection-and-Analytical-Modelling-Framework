@@ -1,0 +1,163 @@
+version: "3.9"
+
+services:
+  # Namenode service with Hadoop 2.7.4 (using bde2020 image)
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop2.7.4-java8
+    container_name: namenode
+    volumes:
+      - namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+    env_file:
+      - ./hadoop-hive.env
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.2
+    ports:
+      - "50070:50070"
+      - "8020:8020"
+
+  # Datanode service with Hadoop 2.7.4 (using bde2020 image)
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop2.7.4-java8
+    container_name: datanode
+    volumes:
+      - datanode:/hadoop/dfs/data
+    env_file:
+      - ./hadoop-hive.env
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070"
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.3
+    ports:
+      - "50010:50010"
+    depends_on:
+      - namenode
+
+  # Hive Metastore PostgreSQL with PostgreSQL 15.7
+  hive-metastore-postgresql:
+    image: bde2020/hive-metastore-postgresql:2.3.0
+    container_name: hive-metastore-postgresql
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.4
+    ports:
+      - "5432:5432"
+
+  # Hive Metastore service with bde2020/hive
+  hive-metastore:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-metastore
+    env_file:
+      - ./hadoop-hive.env
+    command: /opt/hive/bin/hive --service metastore
+    environment:
+      SERVICE_PRECONDITION: "namenode:50070 datanode:50075 hive-metastore-postgresql:5432"
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.5
+    ports:
+      - "9083:9083"
+    depends_on:
+      - hive-metastore-postgresql
+      - namenode
+      - datanode
+
+  # Hive Server service for querying (JDBC)
+  hive-server:
+    image: bde2020/hive:2.3.2-postgresql-metastore
+    container_name: hive-server
+    env_file:
+      - ./hadoop-hive.env
+    environment:
+      HIVE_CORE_CONF_javax_jdo_option_ConnectionURL: "jdbc:postgresql://hive-metastore-postgresql/metastore"
+      SERVICE_PRECONDITION: "hive-metastore:9083"
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.6
+    ports:
+      - "10000:10000"
+    depends_on:
+      - hive-metastore
+
+  # Kafka service with Kafka 7.5.0
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.7
+
+  # Zookeeper service (required by Kafka) with cp-zookeeper 7.5.0
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.8
+
+  # Spark service with Apache Spark 3.5.1
+  spark:
+    image: apache/spark:3.5.1
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_URL=spark://spark:7077
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.9
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    depends_on:
+      - namenode
+    command: ["tail","-f","/dev/null"]
+  # ClickHouse service with the latest version
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      hadoop-network:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+networks:
+  hadoop-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.20.0.0/24"
+
+volumes:
+  namenode:
+  datanode:
+  hive-metastore-data:
+  clickhouse-data:
+
